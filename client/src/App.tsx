@@ -7,17 +7,17 @@ import { connectSocket } from './services/socket';
 import { theme } from './theme';
 
 export default function App() {
-    const accessToken = useAppSelector((state) => state.auth.accessToken);
+    const { accessToken, isAuthenticated } = useAppSelector((state) => state.auth);
 
     useGetMeQuery(undefined, {
-        skip: !accessToken
+        skip: isAuthenticated
     });
 
     useEffect(() => {
-        if (accessToken) {
+        if (isAuthenticated) {
             connectSocket(accessToken);
         }
-    }, [accessToken]);
+    }, [accessToken, isAuthenticated]);
 
     return (
         <ThemeProvider theme={theme}>

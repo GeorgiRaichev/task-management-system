@@ -13,13 +13,15 @@ export const getSocket = () => {
     return socket;
 };
 
-export const connectSocket = (accessToken: string) => {
+export const connectSocket = (accessToken?: string | null) => {
     const activeSocket = getSocket();
 
     if (!activeSocket.connected) {
-        activeSocket.auth = {
-            token: accessToken
-        };
+        if (accessToken) {
+            activeSocket.auth = {
+                token: accessToken
+            };
+        }
 
         activeSocket.connect();
     }

@@ -5,12 +5,14 @@ type AuthState = {
     user: User | null;
     accessToken: string | null;
     isAuthenticated: boolean;
+    isAuthChecked: boolean;
 };
 
 const initialState: AuthState = {
     user: null,
     accessToken: null,
-    isAuthenticated: false
+    isAuthenticated: false,
+    isAuthChecked: false
 };
 
 const authSlice = createSlice({
@@ -27,18 +29,24 @@ const authSlice = createSlice({
             state.user = action.payload.user;
             state.accessToken = action.payload.accessToken;
             state.isAuthenticated = true;
+            state.isAuthChecked = true;
         },
         setUser: (state, action: PayloadAction<User>) => {
             state.user = action.payload;
             state.isAuthenticated = true;
+            state.isAuthChecked = true;
+        },
+        setAuthChecked: (state) => {
+            state.isAuthChecked = true;
         },
         clearCredentials: (state) => {
             state.user = null;
             state.accessToken = null;
             state.isAuthenticated = false;
+            state.isAuthChecked = true;
         }
     }
 });
 
-export const { setCredentials, setUser, clearCredentials } = authSlice.actions;
+export const { setCredentials, setUser, setAuthChecked, clearCredentials } = authSlice.actions;
 export default authSlice.reducer;

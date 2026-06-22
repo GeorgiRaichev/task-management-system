@@ -1,5 +1,5 @@
 import { apiSlice } from '../api/apiSlice';
-import { clearCredentials, setCredentials, setUser } from './authSlice';
+import { clearCredentials, setAuthChecked, setCredentials, setUser } from './authSlice';
 import type { AuthResponse, LoginRequest, MeResponse, RegisterRequest } from './types';
 
 export const authApi = apiSlice.injectEndpoints({
@@ -42,17 +42,16 @@ export const authApi = apiSlice.injectEndpoints({
         getMe: builder.query<MeResponse, void>({
             query: () => '/auth/me',
             async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
-                const { data } = await queryFulfilled;
-                dispatch(setUser(data.user));
+                try {
+                    const { data } = await queryFulfilled;
+                    dispatch(setUser(data.user));
+                } catch {
+                    dispatch(setAuthChecked());
+                }
             },
             providesTags: ['Auth']
         })
     })
 });
 
-export const {
-    useLoginMutation,
-    useRegisterMutation,
-    useLogoutMutation,
-    useGetMeQuery
-} = authApi;
+export const { useLoginMutation, useRegisterMutation, useLogoutMutation, useGetMeQuery } = authApi;
