@@ -1,13 +1,13 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 export const connectToDatabase = async () => {
-  const mongoUri = process.env.MONGO_URI;
+    const mongoUri = process.env.MONGO_URI;
 
-  if (!mongoUri) {
-    throw new Error("MONGO_URI is missing");
-  }
+    if (!mongoUri) {
+        throw new Error('MONGO_URI is missing');
+    }
 
-  await mongoose.connect(mongoUri);
+    await mongoose.connect(mongoUri);
 
-  console.log("MongoDB connected successfully");
+    console.log('MongoDB connected successfully');
 };
