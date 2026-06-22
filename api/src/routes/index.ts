@@ -6,6 +6,7 @@ import notificationRoutes from './notifications.routes.js';
 import projectGroupRoutes from './projectGroups.routes.js';
 import projectRoutes from './projects.routes.js';
 import taskRoutes from './tasks.routes.js';
+import userRoutes from './users.routes.js';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ router.get('/health', (_req, res) => {
 });
 
 router.use('/auth', authRoutes);
+router.use('/users', userRoutes);
 router.use('/projects', projectRoutes);
 router.use('/groups', projectGroupRoutes);
 router.use('/tasks', taskRoutes);
