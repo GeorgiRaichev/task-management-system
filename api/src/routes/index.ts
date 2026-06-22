@@ -3,6 +3,7 @@ import authRoutes from './auth.routes.js';
 import projectRoutes from './projects.routes.js';
 import projectGroupRoutes from './projectGroups.routes.js';
 import taskRoutes from './tasks.routes.js';
+import notificationRoutes from './notifications.routes.js';
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use('/auth', authRoutes);
 router.use('/projects', projectRoutes);
 router.use('/groups', projectGroupRoutes);
 router.use('/tasks', taskRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;
