@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { upload } from '../config/upload.js';
+import { attachmentsController } from '../controllers/attachments.controller.js';
 import { taskActivitiesController } from '../controllers/taskActivities.controller.js';
 import { tasksController } from '../controllers/tasks.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
@@ -10,6 +12,8 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/:taskId/attachments', attachmentsController.getTaskAttachments);
+router.post('/:taskId/attachments', upload.single('file'), attachmentsController.uploadAttachment);
 router.get('/:taskId/activity', taskActivitiesController.getTaskActivities);
 router.post(
     '/:taskId/activity',

@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
@@ -7,15 +8,18 @@ import { errorMiddleware } from './middleware/error.middleware.js';
 
 const app = express();
 
-app.use(cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true
-}));
+app.use(
+    cors({
+        origin: process.env.CLIENT_URL,
+        credentials: true
+    })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan('dev'));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 app.use('/api', routes);
 

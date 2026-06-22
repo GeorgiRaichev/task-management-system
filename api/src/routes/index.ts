@@ -1,9 +1,10 @@
 import { Router } from 'express';
+import attachmentRoutes from './attachments.routes.js';
 import authRoutes from './auth.routes.js';
-import projectRoutes from './projects.routes.js';
-import projectGroupRoutes from './projectGroups.routes.js';
-import taskRoutes from './tasks.routes.js';
 import notificationRoutes from './notifications.routes.js';
+import projectGroupRoutes from './projectGroups.routes.js';
+import projectRoutes from './projects.routes.js';
+import taskRoutes from './tasks.routes.js';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/projects', projectRoutes);
 router.use('/groups', projectGroupRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/attachments', attachmentRoutes);
 
 export default router;
