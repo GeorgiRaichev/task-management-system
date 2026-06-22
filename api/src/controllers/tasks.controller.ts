@@ -8,6 +8,7 @@ import { TaskActivityAction } from '../models/taskActivity.model.js';
 import { TaskModel } from '../models/task.model.js';
 import { UserModel, UserRole } from '../models/user.model.js';
 import { createNotification } from '../services/notification.service.js';
+import { socketService } from '../services/socket.service.js';
 import { createTaskActivity } from '../services/taskActivity.service.js';
 
 class TasksController {
@@ -264,6 +265,8 @@ class TasksController {
                 .populate('assignedTo', 'firstName lastName email role')
                 .populate('createdBy', 'firstName lastName email role');
 
+            socketService.emitToProject(projectId, 'task:created', populatedTask);
+
             return res.status(HttpCode.CREATED).json({
                 message: 'Task created successfully',
                 task: populatedTask
@@ -386,6 +389,8 @@ class TasksController {
                 });
             }
 
+            socketService.emitToProject(project._id.toString(), 'task:updated', updatedTask);
+
             return res.status(HttpCode.OK).json({
                 message: 'Task updated successfully',
                 task: updatedTask
@@ -439,6 +444,10 @@ class TasksController {
             });
 
             await TaskModel.findByIdAndDelete(taskId);
+
+            socketService.emitToProject(project._id.toString(), 'task:deleted', {
+                taskId
+            });
 
             return res.status(HttpCode.OK).json({
                 message: 'Task deleted successfully'

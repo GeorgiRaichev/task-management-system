@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import http from 'http';
 import app from './app.js';
 import { connectToDatabase } from './config/database.js';
+import { initializeWebSocket } from './websockets.js';
 
 dotenv.config();
 
@@ -12,6 +13,8 @@ const startServer = async () => {
         await connectToDatabase();
 
         const server = http.createServer(app);
+
+        initializeWebSocket(server);
 
         server.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
