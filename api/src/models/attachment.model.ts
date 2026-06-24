@@ -7,9 +7,9 @@ export type IAttachment = Document & {
     uploadedBy: Types.ObjectId;
     originalName: string;
     fileName: string;
+    fileUrl: string;
     mimeType: string;
     size: number;
-    path: string;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -41,6 +41,11 @@ const attachmentSchema = new Schema<IAttachment>(
             required: true,
             trim: true
         },
+        fileUrl: {
+            type: String,
+            required: true,
+            trim: true
+        },
         mimeType: {
             type: String,
             required: true,
@@ -49,11 +54,6 @@ const attachmentSchema = new Schema<IAttachment>(
         size: {
             type: Number,
             required: true
-        },
-        path: {
-            type: String,
-            required: true,
-            trim: true
         }
     },
     {
@@ -61,5 +61,7 @@ const attachmentSchema = new Schema<IAttachment>(
         versionKey: false
     }
 );
+
+attachmentSchema.index({ task: 1, createdAt: -1 });
 
 export const AttachmentModel = model<IAttachment>('Attachment', attachmentSchema);

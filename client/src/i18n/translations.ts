@@ -154,7 +154,13 @@ export const translations = {
     createdBy: 'Created by',
     projectAlreadyHasGroup: 'This project already has a group',
     me: "Me",
-    projectNeedsGroup: "Your project needs a group"
+    projectNeedsGroup: "Your project needs a group",
+    attachments: 'Attachments',
+    attachment: 'Attachment',
+    uploadAttachment: 'Upload attachment',
+    selectFile: 'Select file',
+    selectedFile: 'Selected file',
+    noAttachments: 'No attachments',
 };
 
 export type TranslationKey = keyof typeof translations;

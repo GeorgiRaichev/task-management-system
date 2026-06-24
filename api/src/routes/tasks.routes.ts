@@ -24,11 +24,7 @@ router.get('/:taskId/attachments', attachmentsController.getTaskAttachments);
 router.post('/:taskId/attachments', upload.single('file'), attachmentsController.uploadAttachment);
 
 router.get('/:taskId/activity', taskActivitiesController.getTaskActivities);
-router.post(
-    '/:taskId/activity',
-    validate(createTaskActivitySchema),
-    taskActivitiesController.createActivity
-);
+router.post('/:taskId/activity', validate(createTaskActivitySchema), taskActivitiesController.createActivity);
 
 router.get('/:taskId', tasksController.getTask);
 router.put('/:taskId', validate(updateTaskSchema), tasksController.updateTask);

@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { upload } from '../config/upload.js';
 import { attachmentsController } from '../controllers/attachments.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 

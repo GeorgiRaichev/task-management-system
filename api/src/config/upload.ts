@@ -1,21 +1,31 @@
-import multer from 'multer';
-import path from 'path';
 import fs from 'fs';
+import path from 'path';
+import multer from 'multer';
 
-const uploadDirectory = path.join(process.cwd(), 'uploads');
+export const uploadsRoot = path.join(process.cwd(), 'uploads');
+export const taskAttachmentsUploadDirectory = path.join(uploadsRoot, 'task-attachments');
 
-if (!fs.existsSync(uploadDirectory)) {
-    fs.mkdirSync(uploadDirectory);
+if (!fs.existsSync(uploadsRoot)) {
+    fs.mkdirSync(uploadsRoot);
+}
+
+if (!fs.existsSync(taskAttachmentsUploadDirectory)) {
+    fs.mkdirSync(taskAttachmentsUploadDirectory, { recursive: true });
 }
 
 const storage = multer.diskStorage({
     destination: (_req, _file, callback) => {
-        callback(null, uploadDirectory);
+        callback(null, taskAttachmentsUploadDirectory);
     },
     filename: (_req, file, callback) => {
         const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
         const extension = path.extname(file.originalname);
-        callback(null, `${file.fieldname}-${uniqueSuffix}${extension}`);
+        const safeName = path
+            .basename(file.originalname, extension)
+            .replace(/\s+/g, '-')
+            .replace(/[^a-zA-Z0-9-_]/g, '');
+
+        callback(null, `${file.fieldname}-${safeName}-${uniqueSuffix}${extension}`);
     }
 });
 

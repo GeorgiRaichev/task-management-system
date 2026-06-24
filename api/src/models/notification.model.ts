@@ -5,6 +5,8 @@ export enum NotificationType {
     TASK_UPDATED = 'task_updated',
     TASK_STATUS_CHANGED = 'task_status_changed',
     PROJECT_UPDATED = 'project_updated',
+    COMMENT_ADDED = 'comment_added',
+    ATTACHMENT_ADDED = 'attachment_added',
     GENERAL = 'general'
 }
 
