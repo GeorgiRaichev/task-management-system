@@ -1,6 +1,7 @@
 import {
     AppBar,
     Avatar,
+    Badge,
     Box,
     Button,
     Container,
@@ -12,6 +13,7 @@ import {
 } from '@mui/material';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import FolderRoundedIcon from '@mui/icons-material/FolderRounded';
+import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
@@ -19,6 +21,8 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAppSelector } from '../app/hooks';
 import { useLogoutMutation } from '../features/auth/authApi';
+import { UserRole } from '../features/auth/types';
+import { useGetNotificationsQuery } from '../features/notifications/notificationsApi';
 import { useTranslate } from '../hooks/useTranslate';
 import { disconnectSocket } from '../services/socket';
 
@@ -30,28 +34,54 @@ export default function MainLayout() {
     const [logout] = useLogoutMutation();
     const { user } = useAppSelector((state) => state.auth);
 
+    const { data: notificationsData } = useGetNotificationsQuery(undefined, {
+        skip: !user,
+        refetchOnMountOrArgChange: true
+    });
+
+    const unreadNotificationsCount =
+        notificationsData?.notifications.filter((notification) => !notification.isRead).length || 0;
+
     const initials = user ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase() : 'N/A';
 
     const navItems = [
         {
             label: translate('dashboard'),
             path: '/dashboard',
-            icon: <DashboardRoundedIcon fontSize="small" />
+            icon: <DashboardRoundedIcon fontSize="small" />,
+            visible: true
         },
         {
             label: translate('projects'),
             path: '/projects',
-            icon: <FolderRoundedIcon fontSize="small" />
+            icon: <FolderRoundedIcon fontSize="small" />,
+            visible: true
+        },
+        {
+            label: translate('groups'),
+            path: '/groups',
+            icon: <GroupsRoundedIcon fontSize="small" />,
+            visible: true
         },
         {
             label: translate('users'),
             path: '/users',
-            icon: <GroupRoundedIcon fontSize="small" />
+            icon: <GroupRoundedIcon fontSize="small" />,
+            visible: user?.role === UserRole.ADMINISTRATOR
         },
         {
             label: translate('notifications'),
             path: '/notifications',
-            icon: <NotificationsRoundedIcon fontSize="small" />
+            icon: (
+                <Badge
+                    badgeContent={unreadNotificationsCount}
+                    color="error"
+                    invisible={unreadNotificationsCount === 0}
+                >
+                    <NotificationsRoundedIcon fontSize="small" />
+                </Badge>
+            ),
+            visible: true
         }
     ];
 
@@ -104,12 +134,7 @@ export default function MainLayout() {
                         </Box>
 
                         <Box>
-                            <Typography
-                                variant="h6"
-                                sx={{
-                                    lineHeight: 1
-                                }}
-                            >
+                            <Typography variant="h6" sx={{ lineHeight: 1 }}>
                                 {translate('appTitle')}
                             </Typography>
 
@@ -126,29 +151,31 @@ export default function MainLayout() {
                             alignItems: 'center'
                         }}
                     >
-                        {navItems.map((item) => {
-                            const isActive = location.pathname === item.path;
+                        {navItems
+                            .filter((item) => item.visible)
+                            .map((item) => {
+                                const isActive = location.pathname === item.path;
 
-                            return (
-                                <Button
-                                    key={item.path}
-                                    onClick={() => navigate(item.path)}
-                                    startIcon={item.icon}
-                                    sx={{
-                                        px: 1.6,
-                                        color: isActive ? 'primary.main' : 'text.secondary',
-                                        bgcolor: isActive
-                                            ? alpha(theme.palette.primary.main, 0.1)
-                                            : 'transparent',
-                                        '&:hover': {
-                                            bgcolor: alpha(theme.palette.primary.main, 0.08)
-                                        }
-                                    }}
-                                >
-                                    {item.label}
-                                </Button>
-                            );
-                        })}
+                                return (
+                                    <Button
+                                        key={item.path}
+                                        onClick={() => navigate(item.path)}
+                                        startIcon={item.icon}
+                                        sx={{
+                                            px: 1.6,
+                                            color: isActive ? 'primary.main' : 'text.secondary',
+                                            bgcolor: isActive
+                                                ? alpha(theme.palette.primary.main, 0.1)
+                                                : 'transparent',
+                                            '&:hover': {
+                                                bgcolor: alpha(theme.palette.primary.main, 0.08)
+                                            }
+                                        }}
+                                    >
+                                        {item.label}
+                                    </Button>
+                                );
+                            })}
 
                         <Stack
                             direction="row"

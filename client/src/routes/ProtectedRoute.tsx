@@ -1,9 +1,14 @@
 import { Box, CircularProgress } from '@mui/material';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAppSelector } from '../app/hooks';
+import type { UserRole } from '../features/auth/types';
 
-export default function ProtectedRoute() {
-    const { isAuthenticated, isAuthChecked } = useAppSelector((state) => state.auth);
+type ProtectedRouteProps = {
+    allowedRoles?: UserRole[];
+};
+
+export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
+    const { user, isAuthenticated, isAuthChecked } = useAppSelector((state) => state.auth);
 
     if (!isAuthChecked) {
         return (
@@ -15,6 +20,10 @@ export default function ProtectedRoute() {
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
+    }
+
+    if (allowedRoles && (!user || !allowedRoles.includes(user.role))) {
+        return <Navigate to="/dashboard" replace />;
     }
 
     return <Outlet />;

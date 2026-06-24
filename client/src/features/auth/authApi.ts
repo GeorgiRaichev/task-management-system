@@ -12,6 +12,8 @@ export const authApi = apiSlice.injectEndpoints({
             }),
             async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
                 const { data } = await queryFulfilled;
+
+                dispatch(apiSlice.util.resetApiState());
                 dispatch(setCredentials({ user: data.user, accessToken: data.accessToken }));
             },
             invalidatesTags: ['Auth']
@@ -24,6 +26,8 @@ export const authApi = apiSlice.injectEndpoints({
             }),
             async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
                 const { data } = await queryFulfilled;
+
+                dispatch(apiSlice.util.resetApiState());
                 dispatch(setCredentials({ user: data.user, accessToken: data.accessToken }));
             },
             invalidatesTags: ['Auth']
@@ -34,8 +38,12 @@ export const authApi = apiSlice.injectEndpoints({
                 method: 'POST'
             }),
             async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
-                await queryFulfilled;
-                dispatch(clearCredentials());
+                try {
+                    await queryFulfilled;
+                } finally {
+                    dispatch(apiSlice.util.resetApiState());
+                    dispatch(clearCredentials());
+                }
             },
             invalidatesTags: ['Auth']
         }),
