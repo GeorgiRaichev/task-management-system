@@ -7,6 +7,7 @@ import { ProjectModel } from '../models/project.model.js';
 import { TaskActivityAction } from '../models/taskActivity.model.js';
 import { TaskModel } from '../models/task.model.js';
 import { UserRole } from '../models/user.model.js';
+import { createNotification } from '../services/notification.service.js';
 import { createTaskActivity } from '../services/taskActivity.service.js';
 
 class CommentsController {
@@ -90,6 +91,40 @@ class CommentsController {
         return authorId === req.user?.userId;
     }
 
+    private async notifyUsersForComment(
+        taskId: string,
+        projectId: string,
+        assignedTo: string | null | undefined,
+        createdBy: string | null | undefined,
+        senderId: string,
+        taskTitle: string
+    ) {
+        const recipientIds = new Set<string>();
+
+        if (assignedTo) {
+            recipientIds.add(assignedTo);
+        }
+
+        if (createdBy) {
+            recipientIds.add(createdBy);
+        }
+
+        recipientIds.delete(senderId);
+
+        await Promise.all(
+            Array.from(recipientIds).map((recipientId) =>
+                createNotification({
+                    recipientId,
+                    senderId,
+                    projectId,
+                    taskId,
+                    title: 'New comment on task',
+                    message: `New comment was added to task "${taskTitle}".`
+                })
+            )
+        );
+    }
+
     public getTaskComments = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const taskId = this.getObjectIdParam(req, 'taskId');
@@ -158,6 +193,15 @@ class CommentsController {
                     content: comment.content
                 }
             });
+
+            await this.notifyUsersForComment(
+                task._id.toString(),
+                project._id.toString(),
+                task.assignedTo?.toString(),
+                task.createdBy.toString(),
+                req.user.userId,
+                task.title
+            );
 
             const populatedComment = await CommentModel.findById(comment._id)
                 .populate('task', 'title status priority')
