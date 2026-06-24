@@ -5,6 +5,7 @@ import {
     Box,
     Button,
     Container,
+    IconButton,
     Stack,
     Toolbar,
     Typography,
@@ -17,14 +18,22 @@ import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAppSelector } from '../app/hooks';
 import { useLogoutMutation } from '../features/auth/authApi';
-import { UserRole } from '../features/auth/types';
+import { UserRole, type UserRole as UserRoleType } from '../features/auth/types';
 import { useGetNotificationsQuery } from '../features/notifications/notificationsApi';
 import { useTranslate } from '../hooks/useTranslate';
+import type { TranslationKey } from '../i18n/translations';
 import { disconnectSocket } from '../services/socket';
+
+const roleLabels: Record<UserRoleType, TranslationKey> = {
+    [UserRole.REGISTERED_USER]: 'registered_user',
+    [UserRole.PROJECT_MANAGER]: 'project_manager',
+    [UserRole.ADMINISTRATOR]: 'administrator'
+};
 
 export default function MainLayout() {
     const theme = useTheme();
@@ -49,25 +58,36 @@ export default function MainLayout() {
             label: translate('dashboard'),
             path: '/dashboard',
             icon: <DashboardRoundedIcon fontSize="small" />,
-            visible: true
+            visible: true,
+            iconOnly: false
         },
         {
             label: translate('projects'),
             path: '/projects',
             icon: <FolderRoundedIcon fontSize="small" />,
-            visible: true
+            visible: true,
+            iconOnly: false
         },
         {
             label: translate('groups'),
             path: '/groups',
             icon: <GroupsRoundedIcon fontSize="small" />,
-            visible: true
+            visible: true,
+            iconOnly: false
         },
         {
             label: translate('users'),
             path: '/users',
             icon: <GroupRoundedIcon fontSize="small" />,
-            visible: user?.role === UserRole.ADMINISTRATOR
+            visible: user?.role === UserRole.ADMINISTRATOR,
+            iconOnly: false
+        },
+        {
+            label: translate('profile'),
+            path: '/profile',
+            icon: <PersonRoundedIcon fontSize="small" />,
+            visible: true,
+            iconOnly: false
         },
         {
             label: translate('notifications'),
@@ -81,7 +101,8 @@ export default function MainLayout() {
                     <NotificationsRoundedIcon fontSize="small" />
                 </Badge>
             ),
-            visible: true
+            visible: true,
+            iconOnly: true
         }
     ];
 
@@ -156,6 +177,26 @@ export default function MainLayout() {
                             .map((item) => {
                                 const isActive = location.pathname === item.path;
 
+                                if (item.iconOnly) {
+                                    return (
+                                        <IconButton
+                                            key={item.path}
+                                            onClick={() => navigate(item.path)}
+                                            sx={{
+                                                color: isActive ? 'primary.main' : 'text.secondary',
+                                                bgcolor: isActive
+                                                    ? alpha(theme.palette.primary.main, 0.1)
+                                                    : 'transparent',
+                                                '&:hover': {
+                                                    bgcolor: alpha(theme.palette.primary.main, 0.08)
+                                                }
+                                            }}
+                                        >
+                                            {item.icon}
+                                        </IconButton>
+                                    );
+                                }
+
                                 return (
                                     <Button
                                         key={item.path}
@@ -212,7 +253,9 @@ export default function MainLayout() {
                                 </Typography>
 
                                 <Typography variant="caption" color="text.secondary">
-                                    {user?.role || translate('notAvailable')}
+                                    {user
+                                        ? translate(roleLabels[user.role])
+                                        : translate('notAvailable')}
                                 </Typography>
                             </Box>
 

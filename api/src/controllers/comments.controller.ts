@@ -78,16 +78,16 @@ class CommentsController {
         };
     }
 
-    private canManageComment(req: Request, authorId: string, projectCreatorId: string) {
+    private canEditComment(req: Request, authorId: string) {
+        return authorId === req.user?.userId;
+    }
+
+    private canDeleteComment(req: Request, authorId: string) {
         if (req.user?.role === UserRole.ADMINISTRATOR) {
             return true;
         }
 
-        if (authorId === req.user?.userId) {
-            return true;
-        }
-
-        return projectCreatorId === req.user?.userId;
+        return authorId === req.user?.userId;
     }
 
     public getTaskComments = async (req: Request, res: Response, next: NextFunction) => {
@@ -192,7 +192,6 @@ class CommentsController {
             }
 
             const taskId = comment.task.toString();
-
             const { hasAccess } = await this.canAccessTask(req, taskId);
 
             if (!hasAccess) {
@@ -226,24 +225,18 @@ class CommentsController {
                 );
             }
 
-            const project = await ProjectModel.findById(comment.project);
+            const { hasAccess } = await this.canAccessTask(req, comment.task.toString());
 
-            if (!project) {
+            if (!hasAccess) {
                 return next(
                     new AppError({
-                        httpCode: HttpCode.NOT_FOUND,
-                        description: 'Project not found'
+                        httpCode: HttpCode.FORBIDDEN,
+                        description: 'Access denied'
                     })
                 );
             }
 
-            const canManage = this.canManageComment(
-                req,
-                comment.author.toString(),
-                project.createdBy.toString()
-            );
-
-            if (!canManage) {
+            if (!this.canEditComment(req, comment.author.toString())) {
                 return next(
                     new AppError({
                         httpCode: HttpCode.FORBIDDEN,
@@ -289,24 +282,18 @@ class CommentsController {
                 );
             }
 
-            const project = await ProjectModel.findById(comment.project);
+            const { hasAccess } = await this.canAccessTask(req, comment.task.toString());
 
-            if (!project) {
+            if (!hasAccess) {
                 return next(
                     new AppError({
-                        httpCode: HttpCode.NOT_FOUND,
-                        description: 'Project not found'
+                        httpCode: HttpCode.FORBIDDEN,
+                        description: 'Access denied'
                     })
                 );
             }
 
-            const canManage = this.canManageComment(
-                req,
-                comment.author.toString(),
-                project.createdBy.toString()
-            );
-
-            if (!canManage) {
+            if (!this.canDeleteComment(req, comment.author.toString())) {
                 return next(
                     new AppError({
                         httpCode: HttpCode.FORBIDDEN,

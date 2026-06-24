@@ -32,7 +32,7 @@ import type { AppNotification } from "../features/notifications/types";
 import { useTranslate } from "../hooks/useTranslate";
 import type { TranslationKey } from "../i18n/translations";
 import { getApiErrorMessage } from "../utils/api-error";
-import { formatDate } from "../utils/date";
+import { formatDateTime } from '../utils/date';
 
 const notificationTypeLabels: Record<string, TranslationKey> = {
   general: "general",
@@ -299,10 +299,7 @@ export default function NotificationsPage() {
                         }}
                       >
                         <Typography variant="caption">
-                          {formatDate(
-                            notification.createdAt,
-                            translate("notAvailable"),
-                          )}
+                          {formatDateTime(notification.createdAt, translate('notAvailable'))}
                         </Typography>
 
                         {notification.sender && (

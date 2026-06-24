@@ -6,6 +6,7 @@ import { ProjectModel } from '../models/project.model.js';
 import { UserRole } from '../models/user.model.js';
 import { createNotification } from '../services/notification.service.js';
 import { getProjectParticipantIds, getUserProjectIds } from '../utils/project-participants.js';
+import { escapeRegex } from '../utils/escape-regex.js';
 
 class ProjectsController {
     private getProjectId(req: Request) {
@@ -19,6 +20,38 @@ class ProjectsController {
         }
 
         return projectId;
+    }
+
+    private normalizeName(name: string) {
+        return name.trim().replace(/\s+/g, ' ');
+    }
+
+    private async ensureUniqueProjectName(name: string, projectId?: string) {
+        if (!name || typeof name !== 'string') {
+            throw new AppError({
+                httpCode: HttpCode.BAD_REQUEST,
+                description: 'Project name is required'
+            });
+        }
+
+        const normalizedName = this.normalizeName(name);
+
+        const existingProject = await ProjectModel.findOne({
+            name: {
+                $regex: `^${escapeRegex(normalizedName)}$`,
+                $options: 'i'
+            },
+            ...(projectId ? { _id: { $ne: projectId } } : {})
+        });
+
+        if (existingProject) {
+            throw new AppError({
+                httpCode: HttpCode.BAD_REQUEST,
+                description: 'Project name already exists'
+            });
+        }
+
+        return normalizedName;
     }
 
     private async notifyProjectParticipants(projectId: string, senderId: string, projectName: string) {
@@ -66,9 +99,7 @@ class ProjectsController {
                 .populate('createdBy', 'firstName lastName email role')
                 .sort({ createdAt: -1 });
 
-            return res.status(HttpCode.OK).json({
-                projects
-            });
+            return res.status(HttpCode.OK).json({ projects });
         } catch (error) {
             return next(error);
         }
@@ -86,7 +117,6 @@ class ProjectsController {
             }
 
             const projectId = this.getProjectId(req);
-
             const project = await ProjectModel.findById(projectId);
 
             if (!project) {
@@ -119,9 +149,7 @@ class ProjectsController {
                 'firstName lastName email role'
             );
 
-            return res.status(HttpCode.OK).json({
-                project: populatedProject
-            });
+            return res.status(HttpCode.OK).json({ project: populatedProject });
         } catch (error) {
             return next(error);
         }
@@ -138,8 +166,11 @@ class ProjectsController {
                 );
             }
 
+            const normalizedName = await this.ensureUniqueProjectName(req.body.name);
+
             const project = await ProjectModel.create({
                 ...req.body,
+                name: normalizedName,
                 createdBy: req.user.userId
             });
 
@@ -169,7 +200,6 @@ class ProjectsController {
             }
 
             const projectId = this.getProjectId(req);
-
             const project = await ProjectModel.findById(projectId);
 
             if (!project) {
@@ -193,17 +223,19 @@ class ProjectsController {
                 );
             }
 
-            const updatedProject = await ProjectModel.findByIdAndUpdate(projectId, req.body, {
+            const updateData = { ...req.body };
+
+            if (updateData.name) {
+                updateData.name = await this.ensureUniqueProjectName(updateData.name, projectId);
+            }
+
+            const updatedProject = await ProjectModel.findByIdAndUpdate(projectId, updateData, {
                 new: true,
                 runValidators: true
             }).populate('createdBy', 'firstName lastName email role');
 
             if (updatedProject) {
-                await this.notifyProjectParticipants(
-                    projectId,
-                    req.user.userId,
-                    updatedProject.name
-                );
+                await this.notifyProjectParticipants(projectId, req.user.userId, updatedProject.name);
             }
 
             return res.status(HttpCode.OK).json({
@@ -227,7 +259,6 @@ class ProjectsController {
             }
 
             const projectId = this.getProjectId(req);
-
             const project = await ProjectModel.findById(projectId);
 
             if (!project) {

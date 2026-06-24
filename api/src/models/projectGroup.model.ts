@@ -50,7 +50,8 @@ const projectGroupSchema = new Schema<IProjectGroup>(
         project: {
             type: Schema.Types.ObjectId,
             ref: 'Project',
-            required: true
+            required: true,
+            unique: true
         },
         createdBy: {
             type: Schema.Types.ObjectId,
@@ -67,5 +68,7 @@ const projectGroupSchema = new Schema<IProjectGroup>(
         versionKey: false
     }
 );
+
+projectGroupSchema.index({ project: 1 }, { unique: true });
 
 export const ProjectGroupModel = model<IProjectGroup>('ProjectGroup', projectGroupSchema);

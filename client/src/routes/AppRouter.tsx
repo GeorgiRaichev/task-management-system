@@ -8,6 +8,8 @@ import RegisterPage from "../pages/RegisterPage";
 import UsersPage from "../pages/UsersPage";
 import ProtectedRoute from "./ProtectedRoute";
 import GroupsPage from "../pages/GroupsPage";
+import ProjectBoardPage from "../pages/ProjectBoardPage";
+import ProfilePage from "../pages/ProfilePage";
 
 import { UserRole } from "../features/auth/types";
 
@@ -22,8 +24,10 @@ export default function AppRouter() {
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
+          <Route path="/projects/:projectId" element={<ProjectBoardPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
       </Route>
 
@@ -34,6 +38,8 @@ export default function AppRouter() {
           <Route path="/users" element={<UsersPage />} />
         </Route>
       </Route>
+
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

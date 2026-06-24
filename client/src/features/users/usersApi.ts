@@ -13,6 +13,10 @@ export const usersApi = apiSlice.injectEndpoints({
             query: () => '/users',
             providesTags: ['Users']
         }),
+        getUserOptions: builder.query<UsersResponse, void>({
+            query: () => '/users/select-options',
+            providesTags: ['Users']
+        }),
         getUser: builder.query<UserResponse, string>({
             query: (userId) => `/users/${userId}`,
             providesTags: ['Users']
@@ -45,6 +49,7 @@ export const usersApi = apiSlice.injectEndpoints({
 
 export const {
     useGetUsersQuery,
+    useGetUserOptionsQuery,
     useGetUserQuery,
     useCreateUserMutation,
     useUpdateUserMutation,

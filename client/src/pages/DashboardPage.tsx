@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
     Avatar,
     Box,
     Button,
     Card,
     CardContent,
+    CircularProgress,
     Stack,
     Typography,
     alpha
@@ -17,16 +18,29 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import { useNavigate } from 'react-router-dom';
 
 import { useAppSelector } from '../app/hooks';
+import { UserRole, type UserRole as UserRoleType } from '../features/auth/types';
+import { useGetNotificationsQuery } from '../features/notifications/notificationsApi';
+import { useGetProjectsQuery } from '../features/projects/projectsApi';
+import { TaskStatus, type Task } from '../features/tasks/types';
+import { useLazyGetProjectTasksQuery } from '../features/tasks/tasksApi';
 import { useTranslate } from '../hooks/useTranslate';
+import type { TranslationKey } from '../i18n/translations';
 
 type StatCardProps = {
     title: string;
     value: string;
     icon: ReactNode;
     gradient: string;
+    loading?: boolean;
 };
 
-function StatCard({ title, value, icon, gradient }: StatCardProps) {
+const roleLabels: Record<UserRoleType, TranslationKey> = {
+    [UserRole.REGISTERED_USER]: 'registered_user',
+    [UserRole.PROJECT_MANAGER]: 'project_manager',
+    [UserRole.ADMINISTRATOR]: 'administrator'
+};
+
+function StatCard({ title, value, icon, gradient, loading }: StatCardProps) {
     return (
         <Card sx={{ height: '100%', overflow: 'hidden', position: 'relative' }}>
             <CardContent sx={{ p: 3 }}>
@@ -46,9 +60,13 @@ function StatCard({ title, value, icon, gradient }: StatCardProps) {
                             {title}
                         </Typography>
 
-                        <Typography variant="h4" sx={{ mt: 1 }}>
-                            {value}
-                        </Typography>
+                        {loading ? (
+                            <CircularProgress size={28} sx={{ mt: 1.5 }} />
+                        ) : (
+                            <Typography variant="h4" sx={{ mt: 1 }}>
+                                {value}
+                            </Typography>
+                        )}
                     </Box>
 
                     <Box
@@ -76,33 +94,95 @@ export default function DashboardPage() {
     const translate = useTranslate();
     const { user } = useAppSelector((state) => state.auth);
 
+    const { data: projectsData, isLoading: isProjectsLoading } = useGetProjectsQuery(undefined, {
+        refetchOnMountOrArgChange: true
+    });
+
+    const { data: notificationsData, isLoading: isNotificationsLoading } =
+        useGetNotificationsQuery(undefined, {
+            refetchOnMountOrArgChange: true
+        });
+
+    const [getProjectTasks] = useLazyGetProjectTasksQuery();
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [isTasksLoading, setIsTasksLoading] = useState(false);
+
+    const projects = useMemo(() => projectsData?.projects || [], [projectsData?.projects]);
+    const notifications = notificationsData?.notifications || [];
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const fetchTasks = async () => {
+            if (projects.length === 0) {
+                setTasks([]);
+                return;
+            }
+
+            setIsTasksLoading(true);
+
+            try {
+                const results = await Promise.all(
+                    projects.map((project) => getProjectTasks(project._id).unwrap())
+                );
+
+                if (isMounted) {
+                    setTasks(results.flatMap((result) => result.tasks));
+                }
+            } catch {
+                if (isMounted) {
+                    setTasks([]);
+                }
+            } finally {
+                if (isMounted) {
+                    setIsTasksLoading(false);
+                }
+            }
+        };
+
+        fetchTasks();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [getProjectTasks, projects]);
+
     const fullName = user ? `${user.firstName} ${user.lastName}` : translate('notAvailable');
     const initials = user ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase() : 'N/A';
+    const userRole = user ? translate(roleLabels[user.role]) : translate('notAvailable');
+
+    const activeTasksCount = tasks.filter((task) => task.status !== TaskStatus.DONE).length;
+    const completedTasksCount = tasks.filter((task) => task.status === TaskStatus.DONE).length;
+    const unreadNotificationsCount = notifications.filter((notification) => !notification.isRead).length;
 
     const stats = [
         {
             title: translate('totalProjects'),
-            value: '0',
+            value: String(projects.length),
             icon: <FolderRoundedIcon />,
-            gradient: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)'
+            gradient: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)',
+            loading: isProjectsLoading
         },
         {
             title: translate('activeTasks'),
-            value: '0',
+            value: String(activeTasksCount),
             icon: <AssignmentTurnedInRoundedIcon />,
-            gradient: 'linear-gradient(135deg, #0f766e 0%, #5eead4 100%)'
+            gradient: 'linear-gradient(135deg, #0f766e 0%, #5eead4 100%)',
+            loading: isTasksLoading
         },
         {
             title: translate('completedTasks'),
-            value: '0',
+            value: String(completedTasksCount),
             icon: <TaskAltRoundedIcon />,
-            gradient: 'linear-gradient(135deg, #7c3aed 0%, #c084fc 100%)'
+            gradient: 'linear-gradient(135deg, #7c3aed 0%, #c084fc 100%)',
+            loading: isTasksLoading
         },
         {
             title: translate('unreadNotifications'),
-            value: '0',
+            value: String(unreadNotificationsCount),
             icon: <NotificationsRoundedIcon />,
-            gradient: 'linear-gradient(135deg, #f97316 0%, #fdba74 100%)'
+            gradient: 'linear-gradient(135deg, #f97316 0%, #fdba74 100%)',
+            loading: isNotificationsLoading
         }
     ];
 
@@ -236,9 +316,7 @@ export default function DashboardPage() {
                                     {translate('role')}
                                 </Typography>
 
-                                <Typography sx={{ fontWeight: 800 }}>
-                                    {user?.role || translate('notAvailable')}
-                                </Typography>
+                                <Typography sx={{ fontWeight: 800 }}>{userRole}</Typography>
                             </Box>
                         </Stack>
                     </CardContent>
@@ -258,14 +336,16 @@ export default function DashboardPage() {
                                 {translate('manageProjects')}
                             </Button>
 
-                            <Button
-                                onClick={() => navigate('/users')}
-                                variant="outlined"
-                                endIcon={<ArrowForwardRoundedIcon />}
-                                sx={{ justifyContent: 'space-between', py: 1.4 }}
-                            >
-                                {translate('viewUsers')}
-                            </Button>
+                            {user?.role === UserRole.ADMINISTRATOR && (
+                                <Button
+                                    onClick={() => navigate('/users')}
+                                    variant="outlined"
+                                    endIcon={<ArrowForwardRoundedIcon />}
+                                    sx={{ justifyContent: 'space-between', py: 1.4 }}
+                                >
+                                    {translate('viewUsers')}
+                                </Button>
+                            )}
 
                             <Button
                                 onClick={() => navigate('/notifications')}

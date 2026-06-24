@@ -7,6 +7,7 @@ import projectGroupRoutes from './projectGroups.routes.js';
 import projectRoutes from './projects.routes.js';
 import taskRoutes from './tasks.routes.js';
 import userRoutes from './users.routes.js';
+import profileRoutes from './profile.routes.js';
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use('/tasks', taskRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/attachments', attachmentRoutes);
 router.use('/comments', commentRoutes);
+router.use('/profile', profileRoutes);
 
 export default router;

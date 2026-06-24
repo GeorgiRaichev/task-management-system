@@ -45,9 +45,10 @@ import {
   useGetGroupsQuery,
   useRemoveMemberMutation,
   useUpdateGroupMutation,
+  useUpdateMemberRoleMutation,
 } from "../features/groups/groupsApi";
 import { useGetProjectsQuery } from "../features/projects/projectsApi";
-import { useGetUsersQuery } from "../features/users/usersApi";
+import { useGetUserOptionsQuery } from "../features/users/usersApi";
 import { useTranslate } from "../hooks/useTranslate";
 import { getApiErrorMessage } from "../utils/api-error";
 import { formatDate } from "../utils/date";
@@ -98,7 +99,7 @@ export default function GroupsPage() {
   const { data: projectsData } = useGetProjectsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
-  const { data: usersData } = useGetUsersQuery(undefined, {
+  const { data: usersData } = useGetUserOptionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
 
@@ -108,6 +109,8 @@ export default function GroupsPage() {
   const [addMember, { isLoading: isAddingMember }] = useAddMemberMutation();
   const [removeMember, { isLoading: isRemovingMember }] =
     useRemoveMemberMutation();
+  const [updateMemberRole, { isLoading: isUpdatingMemberRole }] =
+    useUpdateMemberRoleMutation();
 
   const [formData, setFormData] = useState<GroupFormData>(initialFormData);
   const [formMembers, setFormMembers] = useState<LocalMember[]>([]);
@@ -127,9 +130,17 @@ export default function GroupsPage() {
 
   const groups = groupsData?.groups || [];
   const projects = projectsData?.projects || [];
-  const users = usersData?.users || [];
-  const availableProjectsForGroup = projects.filter((project) =>
-    canCreateGroupForProject(project, user),
+  const users = (usersData?.users || []).filter(
+    (item) => item._id !== user?._id,
+  );
+  const projectIdsWithGroup = new Set(
+    groups.map((group) => group.project?._id).filter(Boolean),
+  );
+
+  const availableProjectsForGroup = projects.filter(
+    (project) =>
+      canCreateGroupForProject(project, user) &&
+      !projectIdsWithGroup.has(project._id),
   );
 
   const isEditMode = Boolean(selectedGroup);
@@ -224,7 +235,7 @@ export default function GroupsPage() {
   };
 
   const handleCloseManageMembers = () => {
-    if (isAddingMember || isRemovingMember) {
+    if (isAddingMember || isRemovingMember || isUpdatingMemberRole) {
       return;
     }
 
@@ -320,6 +331,29 @@ export default function GroupsPage() {
       setGroupToManage(result.group);
       setMemberUserId("");
       setMemberRole(ProjectGroupMemberRole.MEMBER);
+    } catch (errorResponse) {
+      setError(getApiErrorMessage(errorResponse, translate("operationFailed")));
+    }
+  };
+
+  const handleUpdateExistingMemberRole = async (
+    userId: string,
+    role: ProjectGroupMemberRoleType,
+  ) => {
+    if (!groupToManage) {
+      return;
+    }
+
+    setError("");
+
+    try {
+      const result = await updateMemberRole({
+        groupId: groupToManage._id,
+        userId,
+        role,
+      }).unwrap();
+
+      setGroupToManage(result.group);
     } catch (errorResponse) {
       setError(getApiErrorMessage(errorResponse, translate("operationFailed")));
     }
@@ -822,12 +856,38 @@ export default function GroupsPage() {
                               />
                             )}
 
-                            <Chip
-                              label={translate(member.role)}
-                              size="small"
-                              color={getMemberRoleColor(member.role)}
-                              sx={{ fontWeight: 800 }}
-                            />
+                            {isCreator ? (
+                              <Chip
+                                label={translate(member.role)}
+                                size="small"
+                                color={getMemberRoleColor(member.role)}
+                                sx={{ fontWeight: 800 }}
+                              />
+                            ) : (
+                              <TextField
+                                value={member.role}
+                                onChange={(event) =>
+                                  handleUpdateExistingMemberRole(
+                                    member.user._id,
+                                    event.target
+                                      .value as ProjectGroupMemberRoleType,
+                                  )
+                                }
+                                size="small"
+                                select
+                                disabled={isUpdatingMemberRole}
+                                sx={{ minWidth: 130 }}
+                              >
+                                <MenuItem value={ProjectGroupMemberRole.MEMBER}>
+                                  {translate("member")}
+                                </MenuItem>
+                                <MenuItem
+                                  value={ProjectGroupMemberRole.MANAGER}
+                                >
+                                  {translate("manager")}
+                                </MenuItem>
+                              </TextField>
+                            )}
 
                             <IconButton
                               color="error"

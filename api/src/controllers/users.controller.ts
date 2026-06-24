@@ -21,6 +21,20 @@ class UsersController {
         return req.user?.role === UserRole.ADMINISTRATOR;
     }
 
+    public getUserOptions = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const users = await UserModel.find({ isActive: true })
+                .select('firstName lastName email role isActive createdAt updatedAt')
+                .sort({ firstName: 1, lastName: 1 });
+
+            return res.status(HttpCode.OK).json({
+                users
+            });
+        } catch (error) {
+            return next(error);
+        }
+    };
+
     public getUsers = async (req: Request, res: Response, next: NextFunction) => {
         try {
             if (

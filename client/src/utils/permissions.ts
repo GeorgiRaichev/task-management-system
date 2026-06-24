@@ -1,6 +1,6 @@
 import { UserRole, type User } from '../features/auth/types';
+import { ProjectGroupMemberRole, type ProjectGroup } from '../features/groups/types';
 import type { Project } from '../features/projects/types';
-import type { ProjectGroup } from '../features/groups/types';
 
 export const isAdmin = (user: User | null) => {
     return user?.role === UserRole.ADMINISTRATOR;
@@ -30,12 +30,19 @@ export const isGroupCreator = (group: ProjectGroup, user: User | null) => {
     return group.createdBy?._id === user?._id;
 };
 
+export const isGroupManager = (group: ProjectGroup, user: User | null) => {
+    return group.members.some(
+        (member) =>
+            member.user._id === user?._id && member.role === ProjectGroupMemberRole.MANAGER
+    );
+};
+
 export const isGroupMember = (group: ProjectGroup, user: User | null) => {
     return group.members.some((member) => member.user._id === user?._id);
 };
 
 export const canManageGroup = (group: ProjectGroup, user: User | null) => {
-    return isAdmin(user) || isGroupCreator(group, user);
+    return isAdmin(user) || isGroupCreator(group, user) || isGroupManager(group, user);
 };
 
 export const canEditGroup = (group: ProjectGroup, user: User | null) => {

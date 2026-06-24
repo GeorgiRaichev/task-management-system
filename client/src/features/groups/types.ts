@@ -60,6 +60,12 @@ export type AddMemberRequest = {
     role: ProjectGroupMemberRole;
 };
 
+export type UpdateMemberRoleRequest = {
+    groupId: string;
+    userId: string;
+    role: ProjectGroupMemberRole;
+};
+
 export type RemoveMemberRequest = {
     groupId: string;
     userId: string;

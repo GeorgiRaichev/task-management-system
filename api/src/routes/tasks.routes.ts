@@ -8,22 +8,28 @@ import { authenticate } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import { createCommentSchema } from '../validators/comment.validator.js';
 import { createTaskActivitySchema } from '../validators/taskActivity.validator.js';
-import { updateTaskSchema } from '../validators/task.validator.js';
+import { createTaskSchema, updateTaskSchema } from '../validators/task.validator.js';
 
 const router = Router();
 
 router.use(authenticate);
 
+router.get('/project/:projectId', tasksController.getProjectTasks);
+router.post('/project/:projectId', validate(createTaskSchema), tasksController.createTask);
+
 router.get('/:taskId/comments', commentsController.getTaskComments);
 router.post('/:taskId/comments', validate(createCommentSchema), commentsController.createComment);
+
 router.get('/:taskId/attachments', attachmentsController.getTaskAttachments);
 router.post('/:taskId/attachments', upload.single('file'), attachmentsController.uploadAttachment);
+
 router.get('/:taskId/activity', taskActivitiesController.getTaskActivities);
 router.post(
     '/:taskId/activity',
     validate(createTaskActivitySchema),
     taskActivitiesController.createActivity
 );
+
 router.get('/:taskId', tasksController.getTask);
 router.put('/:taskId', validate(updateTaskSchema), tasksController.updateTask);
 router.delete('/:taskId', tasksController.deleteTask);

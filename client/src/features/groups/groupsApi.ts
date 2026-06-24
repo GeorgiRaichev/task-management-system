@@ -5,7 +5,8 @@ import type {
     GroupResponse,
     GroupsResponse,
     RemoveMemberRequest,
-    UpdateGroupRequest
+    UpdateGroupRequest,
+    UpdateMemberRoleRequest
 } from './types';
 
 export const groupsApi = apiSlice.injectEndpoints({
@@ -48,6 +49,16 @@ export const groupsApi = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ['Groups', 'Projects', 'Notifications']
         }),
+        updateMemberRole: builder.mutation<GroupResponse, UpdateMemberRoleRequest>({
+            query: ({ groupId, userId, role }) => ({
+                url: `/groups/${groupId}/members/${userId}`,
+                method: 'PUT',
+                body: {
+                    role
+                }
+            }),
+            invalidatesTags: ['Groups', 'Projects']
+        }),
         removeMember: builder.mutation<GroupResponse, RemoveMemberRequest>({
             query: ({ groupId, userId }) => ({
                 url: `/groups/${groupId}/members/${userId}`,
@@ -64,5 +75,6 @@ export const {
     useUpdateGroupMutation,
     useDeleteGroupMutation,
     useAddMemberMutation,
+    useUpdateMemberRoleMutation,
     useRemoveMemberMutation
 } = groupsApi;

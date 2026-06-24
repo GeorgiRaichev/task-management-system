@@ -2,13 +2,12 @@ import { Types } from 'mongoose';
 import type { NextFunction, Request, Response } from 'express';
 import { AppError, HttpCode } from '../exceptions/AppError.js';
 import { NotificationType } from '../models/notification.model.js';
-import { ProjectModel } from '../models/project.model.js';
 import { ProjectGroupMemberRole, ProjectGroupModel } from '../models/projectGroup.model.js';
+import { ProjectModel } from '../models/project.model.js';
 import { TaskActivityAction } from '../models/taskActivity.model.js';
-import { TaskModel } from '../models/task.model.js';
+import { TaskModel, TaskStatus } from '../models/task.model.js';
 import { UserModel, UserRole } from '../models/user.model.js';
 import { createNotification } from '../services/notification.service.js';
-import { socketService } from '../services/socket.service.js';
 import { createTaskActivity } from '../services/taskActivity.service.js';
 
 class TasksController {
@@ -25,43 +24,49 @@ class TasksController {
         return value;
     }
 
-    private async canAccessProject(req: Request, projectId: string, createdBy: string) {
-        if (req.user?.role === UserRole.ADMINISTRATOR) {
-            return true;
-        }
+    private async canAssignUserToProject(projectId: string, userId: string) {
+        const project = await this.getProjectOrFail(projectId);
 
-        if (createdBy === req.user?.userId) {
+        if (project.createdBy.toString() === userId) {
             return true;
         }
 
         const group = await ProjectGroupModel.exists({
             project: projectId,
-            'members.user': req.user?.userId
+            'members.user': userId
         });
 
         return Boolean(group);
     }
 
-    private async canManageProject(req: Request, projectId: string, createdBy: string) {
-        if (req.user?.role === UserRole.ADMINISTRATOR) {
-            return true;
+    private getReferenceId(value: unknown) {
+        if (!value) {
+            return null;
         }
 
-        if (createdBy === req.user?.userId) {
-            return true;
+        if (value instanceof Types.ObjectId) {
+            return value.toString();
         }
 
-        const group = await ProjectGroupModel.exists({
-            project: projectId,
-            members: {
-                $elemMatch: {
-                    user: req.user?.userId,
-                    role: ProjectGroupMemberRole.MANAGER
-                }
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        if (typeof value === 'object' && '_id' in value) {
+            const objectId = (value as { _id?: unknown })._id;
+
+            if (objectId instanceof Types.ObjectId) {
+                return objectId.toString();
             }
-        });
 
-        return Boolean(group);
+            if (typeof objectId === 'string') {
+                return objectId;
+            }
+
+            return objectId ? String(objectId) : null;
+        }
+
+        return String(value);
     }
 
     private async getProjectOrFail(projectId: string) {
@@ -90,32 +95,131 @@ class TasksController {
         return task;
     }
 
-    private getChanges(oldData: Record<string, unknown>, newData: Record<string, unknown>) {
-        const changes: Record<string, unknown> = {};
+    private async isProjectMember(projectId: string, userId: string) {
+        const group = await ProjectGroupModel.exists({
+            project: projectId,
+            'members.user': userId
+        });
 
-        for (const key of Object.keys(newData)) {
-            const oldValue = oldData[key];
-            const newValue = newData[key];
+        return Boolean(group);
+    }
 
-            changes[key] = {
-                from: oldValue instanceof Date ? oldValue.toISOString() : oldValue,
-                to: newValue
-            };
+    private async isProjectManager(projectId: string, userId: string) {
+        const group = await ProjectGroupModel.exists({
+            project: projectId,
+            members: {
+                $elemMatch: {
+                    user: userId,
+                    role: ProjectGroupMemberRole.MANAGER
+                }
+            }
+        });
+
+        return Boolean(group);
+    }
+
+    private async canAccessProject(req: Request, projectId: string) {
+        if (!req.user) {
+            return false;
         }
 
-        return changes;
+        const project = await this.getProjectOrFail(projectId);
+
+        if (req.user.role === UserRole.ADMINISTRATOR) {
+            return true;
+        }
+
+        if (project.createdBy.toString() === req.user.userId) {
+            return true;
+        }
+
+        return this.isProjectMember(projectId, req.user.userId);
+    }
+
+    private async canManageProjectTasks(req: Request, projectId: string) {
+        if (!req.user) {
+            return false;
+        }
+
+        const project = await this.getProjectOrFail(projectId);
+
+        if (req.user.role === UserRole.ADMINISTRATOR) {
+            return true;
+        }
+
+        if (project.createdBy.toString() === req.user.userId) {
+            return true;
+        }
+
+        return this.isProjectManager(projectId, req.user.userId);
+    }
+
+    private async notifyAssignedUser(
+        taskId: string,
+        projectId: string,
+        assignedTo: string | null,
+        senderId: string,
+        title: string
+    ) {
+        if (!assignedTo || assignedTo === senderId) {
+            return;
+        }
+
+        await createNotification({
+            recipientId: assignedTo,
+            senderId,
+            projectId,
+            taskId,
+            type: NotificationType.TASK_ASSIGNED,
+            title: 'Task assigned',
+            message: `You were assigned to task "${title}".`
+        });
+    }
+
+    private async notifyTaskStatusChanged(
+        taskId: string,
+        projectId: string,
+        assignedTo: string | null,
+        senderId: string,
+        title: string,
+        status: TaskStatus
+    ) {
+        if (!assignedTo || assignedTo === senderId) {
+            return;
+        }
+
+        await createNotification({
+            recipientId: assignedTo,
+            senderId,
+            projectId,
+            taskId,
+            type: NotificationType.TASK_STATUS_CHANGED,
+            title: 'Task status changed',
+            message: `Task "${title}" status was changed to ${status}.`
+        });
+    }
+
+    private buildTaskUpdateData(body: {
+        title?: string;
+        description?: string;
+        assignedTo?: string | null;
+        priority?: string;
+        status?: string;
+        dueDate?: string;
+    }) {
+        return {
+            ...body,
+            ...(Object.prototype.hasOwnProperty.call(body, 'assignedTo')
+                ? { assignedTo: body.assignedTo || null }
+                : {}),
+            ...(body.dueDate ? { dueDate: new Date(body.dueDate) } : {})
+        };
     }
 
     public getProjectTasks = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const projectId = this.getObjectIdParam(req, 'projectId');
-            const project = await this.getProjectOrFail(projectId);
-
-            const hasAccess = await this.canAccessProject(
-                req,
-                projectId,
-                project.createdBy.toString()
-            );
+            const hasAccess = await this.canAccessProject(req, projectId);
 
             if (!hasAccess) {
                 return next(
@@ -127,7 +231,7 @@ class TasksController {
             }
 
             const tasks = await TaskModel.find({ project: projectId })
-                .populate('project', 'name status deadline')
+                .populate('project', 'name status deadline createdBy')
                 .populate('assignedTo', 'firstName lastName email role')
                 .populate('createdBy', 'firstName lastName email role')
                 .sort({ createdAt: -1 });
@@ -144,17 +248,9 @@ class TasksController {
         try {
             const taskId = this.getObjectIdParam(req, 'taskId');
             const task = await this.getTaskOrFail(taskId);
-            const project = await this.getProjectOrFail(task.project.toString());
+            const hasAccess = await this.canAccessProject(req, task.project.toString());
 
-            const hasAccess = await this.canAccessProject(
-                req,
-                project._id.toString(),
-                project.createdBy.toString()
-            );
-
-            const isAssignedUser = task.assignedTo?.toString() === req.user?.userId;
-
-            if (!hasAccess && !isAssignedUser) {
+            if (!hasAccess && task.assignedTo?.toString() !== req.user?.userId) {
                 return next(
                     new AppError({
                         httpCode: HttpCode.FORBIDDEN,
@@ -164,7 +260,7 @@ class TasksController {
             }
 
             const populatedTask = await TaskModel.findById(taskId)
-                .populate('project', 'name status deadline')
+                .populate('project', 'name status deadline createdBy')
                 .populate('assignedTo', 'firstName lastName email role')
                 .populate('createdBy', 'firstName lastName email role');
 
@@ -188,13 +284,7 @@ class TasksController {
             }
 
             const projectId = this.getObjectIdParam(req, 'projectId');
-            const project = await this.getProjectOrFail(projectId);
-
-            const canManage = await this.canManageProject(
-                req,
-                projectId,
-                project.createdBy.toString()
-            );
+            const canManage = await this.canManageProjectTasks(req, projectId);
 
             if (!canManage) {
                 return next(
@@ -205,19 +295,8 @@ class TasksController {
                 );
             }
 
-            const { assignedTo } = req.body;
-
-            if (assignedTo) {
-                if (!Types.ObjectId.isValid(assignedTo)) {
-                    return next(
-                        new AppError({
-                            httpCode: HttpCode.BAD_REQUEST,
-                            description: 'Invalid assigned user id'
-                        })
-                    );
-                }
-
-                const assignedUser = await UserModel.findById(assignedTo);
+            if (req.body.assignedTo) {
+                const assignedUser = await UserModel.findById(req.body.assignedTo);
 
                 if (!assignedUser) {
                     return next(
@@ -227,10 +306,23 @@ class TasksController {
                         })
                     );
                 }
+
+                const canAssign = await this.canAssignUserToProject(projectId, req.body.assignedTo);
+
+                if (!canAssign) {
+                    return next(
+                        new AppError({
+                            httpCode: HttpCode.BAD_REQUEST,
+                            description: 'Assigned user must be a project participant'
+                        })
+                    );
+                }
             }
 
             const task = await TaskModel.create({
                 ...req.body,
+                assignedTo: req.body.assignedTo || null,
+                dueDate: new Date(req.body.dueDate),
                 project: projectId,
                 createdBy: req.user.userId
             });
@@ -243,29 +335,22 @@ class TasksController {
                 message: 'Task created',
                 changes: {
                     title: task.title,
-                    status: task.status,
-                    priority: task.priority
+                    status: task.status
                 }
             });
 
-            if (assignedTo && assignedTo !== req.user.userId) {
-                await createNotification({
-                    recipientId: assignedTo,
-                    senderId: req.user.userId,
-                    projectId,
-                    taskId: task._id.toString(),
-                    type: NotificationType.TASK_ASSIGNED,
-                    title: 'New task assigned',
-                    message: `You have been assigned to task: ${task.title}`
-                });
-            }
+            await this.notifyAssignedUser(
+                task._id.toString(),
+                projectId,
+                task.assignedTo?.toString() || null,
+                req.user.userId,
+                task.title
+            );
 
             const populatedTask = await TaskModel.findById(task._id)
-                .populate('project', 'name status deadline')
+                .populate('project', 'name status deadline createdBy')
                 .populate('assignedTo', 'firstName lastName email role')
                 .populate('createdBy', 'firstName lastName email role');
-
-            socketService.emitToProject(projectId, 'task:created', populatedTask);
 
             return res.status(HttpCode.CREATED).json({
                 message: 'Task created successfully',
@@ -289,17 +374,14 @@ class TasksController {
 
             const taskId = this.getObjectIdParam(req, 'taskId');
             const task = await this.getTaskOrFail(taskId);
-            const project = await this.getProjectOrFail(task.project.toString());
+            const projectId = task.project.toString();
+            const canManage = await this.canManageProjectTasks(req, projectId);
 
-            const canManage = await this.canManageProject(
-                req,
-                project._id.toString(),
-                project.createdBy.toString()
-            );
-
+            const bodyKeys = Object.keys(req.body);
+            const onlyStatusChange = bodyKeys.length === 1 && bodyKeys[0] === 'status';
             const isAssignedUser = task.assignedTo?.toString() === req.user.userId;
 
-            if (!canManage && !isAssignedUser) {
+            if (!canManage && !(onlyStatusChange && isAssignedUser)) {
                 return next(
                     new AppError({
                         httpCode: HttpCode.FORBIDDEN,
@@ -308,19 +390,8 @@ class TasksController {
                 );
             }
 
-            const { assignedTo } = req.body;
-
-            if (assignedTo) {
-                if (!Types.ObjectId.isValid(assignedTo)) {
-                    return next(
-                        new AppError({
-                            httpCode: HttpCode.BAD_REQUEST,
-                            description: 'Invalid assigned user id'
-                        })
-                    );
-                }
-
-                const assignedUser = await UserModel.findById(assignedTo);
+            if (req.body.assignedTo) {
+                const assignedUser = await UserModel.findById(req.body.assignedTo);
 
                 if (!assignedUser) {
                     return next(
@@ -330,66 +401,71 @@ class TasksController {
                         })
                     );
                 }
+
+                const canAssign = await this.canAssignUserToProject(projectId, req.body.assignedTo);
+
+                if (!canAssign) {
+                    return next(
+                        new AppError({
+                            httpCode: HttpCode.BAD_REQUEST,
+                            description: 'Assigned user must be a project participant'
+                        })
+                    );
+                }
             }
 
-            const taskBeforeUpdate = task.toObject() as unknown as Record<string, unknown>;
+            const previousAssignedTo = task.assignedTo?.toString() || null;
+            const previousStatus = task.status;
+            const updateData = this.buildTaskUpdateData(req.body);
 
-            const updatedTask = await TaskModel.findByIdAndUpdate(taskId, req.body, {
+            const updatedTask = await TaskModel.findByIdAndUpdate(taskId, updateData, {
                 new: true,
                 runValidators: true
             })
-                .populate('project', 'name status deadline')
+                .populate('project', 'name status deadline createdBy')
                 .populate('assignedTo', 'firstName lastName email role')
                 .populate('createdBy', 'firstName lastName email role');
 
-            const changes = this.getChanges(taskBeforeUpdate, req.body as Record<string, unknown>);
+            if (!updatedTask) {
+                return next(
+                    new AppError({
+                        httpCode: HttpCode.NOT_FOUND,
+                        description: 'Task not found'
+                    })
+                );
+            }
 
-            const action =
-                typeof req.body.status !== 'undefined'
-                    ? TaskActivityAction.STATUS_CHANGED
-                    : TaskActivityAction.UPDATED;
-
-            const message =
-                typeof req.body.status !== 'undefined' ? 'Task status changed' : 'Task updated';
+            const nextAssignedTo = this.getReferenceId(updatedTask.assignedTo);
 
             await createTaskActivity({
                 taskId,
-                projectId: project._id.toString(),
+                projectId,
                 userId: req.user.userId,
-                action,
-                message,
-                changes
+                action: TaskActivityAction.UPDATED,
+                message: 'Task updated',
+                changes: req.body
             });
 
-            if (req.body.assignedTo && req.body.assignedTo !== req.user.userId) {
-                await createNotification({
-                    recipientId: req.body.assignedTo,
-                    senderId: req.user.userId,
-                    projectId: project._id.toString(),
+            if (previousAssignedTo !== nextAssignedTo) {
+                await this.notifyAssignedUser(
                     taskId,
-                    type: NotificationType.TASK_ASSIGNED,
-                    title: 'Task assigned',
-                    message: `You have been assigned to task: ${task.title}`
-                });
+                    projectId,
+                    nextAssignedTo,
+                    req.user.userId,
+                    updatedTask.title
+                );
             }
 
-            if (
-                typeof req.body.status !== 'undefined' &&
-                task.assignedTo &&
-                task.assignedTo.toString() !== req.user.userId
-            ) {
-                await createNotification({
-                    recipientId: task.assignedTo.toString(),
-                    senderId: req.user.userId,
-                    projectId: project._id.toString(),
+            if (previousStatus !== updatedTask.status) {
+                await this.notifyTaskStatusChanged(
                     taskId,
-                    type: NotificationType.TASK_STATUS_CHANGED,
-                    title: 'Task status changed',
-                    message: `Task status was changed to: ${req.body.status}`
-                });
+                    projectId,
+                    nextAssignedTo,
+                    req.user.userId,
+                    updatedTask.title,
+                    updatedTask.status
+                );
             }
-
-            socketService.emitToProject(project._id.toString(), 'task:updated', updatedTask);
 
             return res.status(HttpCode.OK).json({
                 message: 'Task updated successfully',
@@ -413,13 +489,7 @@ class TasksController {
 
             const taskId = this.getObjectIdParam(req, 'taskId');
             const task = await this.getTaskOrFail(taskId);
-            const project = await this.getProjectOrFail(task.project.toString());
-
-            const canManage = await this.canManageProject(
-                req,
-                project._id.toString(),
-                project.createdBy.toString()
-            );
+            const canManage = await this.canManageProjectTasks(req, task.project.toString());
 
             if (!canManage) {
                 return next(
@@ -430,23 +500,17 @@ class TasksController {
                 );
             }
 
+            await TaskModel.findByIdAndDelete(taskId);
+
             await createTaskActivity({
                 taskId,
-                projectId: project._id.toString(),
+                projectId: task.project.toString(),
                 userId: req.user.userId,
                 action: TaskActivityAction.DELETED,
                 message: 'Task deleted',
                 changes: {
-                    title: task.title,
-                    status: task.status,
-                    priority: task.priority
+                    title: task.title
                 }
-            });
-
-            await TaskModel.findByIdAndDelete(taskId);
-
-            socketService.emitToProject(project._id.toString(), 'task:deleted', {
-                taskId
             });
 
             return res.status(HttpCode.OK).json({
